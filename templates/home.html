@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <div class="text-center">
+        {% if is_authenticated %}
+        <h1>Welcome to the Order Management System -- {{ current_user['username']}}</h1>
+        <p>This application allows you to manage orders based on your role as a user or an admin.</p>
+        {% else %}
+        <h1>Welcome to the Order Management System.</h1>
+        <p>This application allows you to manage orders based on your role as a user or an admin.</p>
+        <p>Please sign in or login for orders.</p>
+        {% endif %}
+    </div>
+{% endblock %}
