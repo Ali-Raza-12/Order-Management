@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div class='container mt-3'>
+      {% for category, message in messages %}
+      <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
+<h2>Create Product</h2>
+<form method="POST" action="{{ url_for('create_product') }}">
+    {{ form.hidden_tag() }}  
+
+    <div class="mb-3">
+        {{ form.name.label }}  <!-- Product Name -->
+        {{ form.name(class="form-control") }}
+        {% for error in form.name.errors %}
+            <div class="text-danger">{{ error }}</div>
+        {% endfor %}
+    </div>
+
+    <div class="mb-3">
+        {{ form.price.label }} 
+        {{ form.price(class="form-control") }}
+        {% for error in form.price.errors %}
+            <div class="text-danger">{{ error }}</div>
+        {% endfor %}
+    </div>
+
+    <div class="mb-3">
+        {{ form.stock.label }} 
+        {{ form.stock(class="form-control") }}
+        {% for error in form.stock.errors %}
+            <div class="text-danger">{{ error }}</div>
+        {% endfor %}
+    </div>
+
+    <button type="submit" class="btn btn-primary">Create Product</button>
+    <a href="{{ url_for('products') }}" class="btn btn-secondary">Cancel</a> <!-- Link to go back to products list -->
+</form>
+
+{% endblock %}

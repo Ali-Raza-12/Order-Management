@@ -2,7 +2,25 @@
 
 {% block content %}
 
-<button type="button" class="btn btn-success mb-4">Create User</button>
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div class='container mt-3'>
+      {% for category, message in messages %}
+      <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+        </button>
+    </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Users</h2>
+    <a href="{{ url_for('create_user') }}" class="btn btn-success">Create User</a>
+</div>
 
 <table class="table">
     <thead>
@@ -17,12 +35,12 @@
       {% if users|length > 0 %} 
         {% for user in users %}
           <tr>
-            <th scope="row">{{ user.id }}</th>
+            <th scope="row">{{ loop.index }}</th>
             <td>{{ user.username }}</td>
             <td>{{ user.role }}</td>
-            <td class="text-center"> <!-- Center the buttons -->
-              <button type="button" class="btn btn-light">Update</button>
-              <button type="button" class="btn btn-dark">Delete</button>
+            <td class="d-flex justify-content-center"> <!-- Center actions -->
+              <a  type="button" class="btn btn-outline-dark btn-sm mx-1" href="/user-dashboard/update-user/{{user.id}}">Update</a>
+              <a  type="button" class="btn btn-outline-dark btn-sm mx-1" href="/user-dashboard/delete/{{user.id}}">Delete</a>
             </td>
           </tr>
         {% endfor %}

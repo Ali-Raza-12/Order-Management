@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div class='container mt-3'>
+      {% for category, message in messages %}
+      <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
+<h2>Order Details</h2>
+
+<table class="table">
+  <thead>
+    <tr>
+      <th scope="col">Order ID</th>
+      <th scope="col">Username</th>
+      <th scope="col">Shipping Address</th>
+      <th scope="col">Total Payable</th>
+      <th scope="col">Status</th>
+      <th scope="col" class="text-center">Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% if orders|length > 0 %}
+      {% for order in orders %}
+      <tr>
+        <th scope="row">{{ order.id }}</th>
+        <td>{{ order.created_by }}</td>
+        <td>{{ order.shipping_address }}</td>
+        <td>${{ order.total_payable }}</td>
+        <td>{{ order.status }}</td>
+        <td class="text-center">
+          {% if current_user.role == 'admin' %}
+            {% if order.status == 'Pending' %}
+            <form action="{{ url_for('accept_order', order_id=order.id) }}" method="POST" style="display:inline;">
+              <button type="submit" class="btn btn-success btn-sm">Accept</button>
+            </form>
+            <form action="{{ url_for('reject_order', order_id=order.id) }}" method="POST" style="display:inline;">
+              <button type="submit" class="btn btn-danger btn-sm">Reject</button>
+            </form>
+            {% endif %}
+          {% else %}
+            {% if order.status == 'Pending' %}
+              <span class="text-warning">Status: Pending</span>
+            {% elif order.status == 'Accepted' %}
+              <span class="text-success">Status: Accepted</span>
+            {% elif order.status == 'Rejected' %}
+              <span class="text-danger">Status: Rejected</span>
+            {% endif %}
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    {% else %}
+      <tr>
+        <td colspan="6" class="text-center">No Orders Found.</td>
+      </tr>
+    {% endif %}
+  </tbody>
+</table>
+
+{% endblock %}

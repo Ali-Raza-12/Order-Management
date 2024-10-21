@@ -1,14 +1,81 @@
 {% extends "base.html" %}
 
 {% block content %}
-    <div class="text-center">
-        {% if is_authenticated %}
-        <h1>Welcome to the Order Management System -- {{ current_user['username']}}</h1>
-        <p>This application allows you to manage orders based on your role as a user or an admin.</p>
-        {% else %}
-        <h1>Welcome to the Order Management System.</h1>
-        <p>This application allows you to manage orders based on your role as a user or an admin.</p>
-        <p>Please sign in or login for orders.</p>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="container mt-3">
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                {% endfor %}
+            </div>
         {% endif %}
+    {% endwith %}
+
+    <div class="text-center">
+        <div>
+            {% if is_authenticated %} 
+                <h5>Hello, {{ current_user['username'] }}</h5>
+            {% endif %}
+
+            <h2>Welcome to the Order Management System</h2>
+            
+            <p>
+                This application allows you to manage orders based on your role as a user 
+                {% if is_authenticated %} or an admin.
+            </p>
+
+            <!-- Card Section -->
+            <div class="row mt-4">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">Items</h5>
+                            <a href="{{ url_for('orders') }}" class="btn btn-primary">Purchase Items</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 mt-2">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">Orders</h5>
+                            <a href="{{ url_for('manage_order')}}" class="btn btn-primary">Manage Orders</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">Customers</h5>
+                            <a href="{{ url_for('customers')}}" class="btn btn-primary">View customers</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 mt-2">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">Products</h5>
+                            <a href="{{ url_for('products')}}" class="btn btn-primary">Manage Products</a>
+                        </div>
+                    </div>
+                </div>
+                {% if current_user['role'] == 'admin' %}
+                <div class="col-md-6 mt-2">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">Users</h5>
+                            <a href="{{ url_for('user_dashboard')}}" class="btn btn-primary">Manage users</a>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            {% else %} Please sign in or login for orders.{% endif %}
+        </div>
     </div>
 {% endblock %}
