@@ -1,68 +1,50 @@
-from flask import Flask, render_template, flash, redirect, url_for, jsonify, request
-from models import User, bcrypt, db, Orders, Products, OrderItem
-from forms import SignupForm, LoginForm, OrderForm, AddProductForm, OrderItemForm
+from flask import Flask, render_template, flash, redirect, url_for, request, g
+from models import User, bcrypt, db, Products, Orders
+from forms import SignupForm, LoginForm, AddProductForm
 from config import Config
-from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity, JWTManager, decode_token
-from datetime import timedelta
+from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
+from flask_bcrypt import Bcrypt
 
 app = Flask(__name__)
 app.config.from_object(Config)
 db.init_app(app)
-jwt = JWTManager(app)
+bcrypt = Bcrypt(app)
 
-@app.route('/')
-def home():
-    is_authenticated, current_user = get_authenticated_user()
-    return render_template('home.html', is_authenticated=is_authenticated, current_user=current_user)
+login_manager = LoginManager(app)
+login_manager.login_view = 'login' 
 
-def get_authenticated_user():
-    current_user = None
-    is_authenticated = False
-    try:
-        access_token = request.cookies.get('access_token')
-        if access_token:
-            decoded_token = decode_token(access_token, allow_expired=False)
-            current_user = decoded_token['sub']  
-            is_authenticated = True
-    except Exception as e:
-        print(f'Error in getting current user: {e}')
-    
-    return is_authenticated, current_user
+class AuthUser(UserMixin):
+    def __init__(self, user):
+        self.id = user.id  
+        self.username = user.username
+        self.role = user.role
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id)) 
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
-
-    is_authenticated, current_user = get_authenticated_user()
-    if is_authenticated:
-        return redirect(url_for('home'))
-    
     form = SignupForm()
     if form.validate_on_submit():
         hashed_password = bcrypt.generate_password_hash(form.password.data).decode('utf-8')
         user = User(
             username=form.username.data, 
             password=hashed_password, 
-            role=form.role.data,
-            created_by=None,  
-            updated_by=None  
+            role=form.role.data
         )
         try:
             db.session.add(user)
             db.session.commit()
             flash('User created successfully', 'success')
             return redirect(url_for('login'))
-        except Exception as e:
+        except Exception:
             db.session.rollback()
-            print(e) 
             flash('An error occurred while creating your account. Please try again.', 'danger')
     return render_template('signup.html', form=form)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    is_authenticated, current_user = get_authenticated_user()
-    if is_authenticated:
-        return redirect(url_for('home'))
-
     form = LoginForm()
     if form.validate_on_submit():
         username = form.username.data
@@ -70,11 +52,9 @@ def login():
         
         user = User.query.filter_by(username=username).first()
         if user and bcrypt.check_password_hash(user.password, password):
-            access_token = create_access_token(identity={'username': user.username, 'role': user.role}, expires_delta=timedelta(days=1))
-            flash('Login successful', 'success')
-            response = redirect(url_for('home'))
-            response.set_cookie('access_token', access_token, httponly=True) 
-            return response
+            auth_user = AuthUser(user)
+            login_user(auth_user)  # Log in the user
+            return redirect(url_for('home'))
         else:
             flash('Login unsuccessful. Please check your username and password', 'danger')
     return render_template('login.html', form=form)
@@ -82,51 +62,42 @@ def login():
 @app.route('/logout')
 def logout():
     flash('You have been logged out.', 'info')
-    response = redirect(url_for('home'))
-    response.delete_cookie('access_token')
-    return response
+    logout_user()  # Log out the user
+    return redirect(url_for('home'))
+
+@app.route('/')
+def home():
+    return render_template('home.html', is_authenticated=current_user.is_authenticated, current_user=current_user)
 
 @app.route('/customers')
+@login_required
 def customers():
-    is_authenticated, current_user = get_authenticated_user()
-    if not is_authenticated:
-        return redirect(url_for('login'))
-
     users = User.query.all()
-    return render_template('customers.html', users=users, is_authenticated=is_authenticated)
+    return render_template('customers.html', users=users, is_authenticated=current_user.is_authenticated)
 
 @app.route('/customers/delete/<int:id>')
+@login_required
 def delete_customer(id):
     user = User.query.get(id)
-
     try:
         db.session.delete(user)
         db.session.commit()
         flash('Customer deleted successfully.', 'success')
         return redirect(url_for('customers'))
     except Exception as e:
-        flash('An error occured', str(e), 'danger')
+        flash('An error occurred', str(e), 'danger')
     return render_template('customers.html')
 
 @app.route('/user-dashboard', methods=['GET'])
+@login_required
 def user_dashboard():
-    access_token = request.cookies.get('access_token')
-    is_authenticated = True
-    if not access_token:
-        return jsonify({"msg": "Missing Authorized Header"}), 401
-    
-    try:
-        current_user = decode_token(access_token)
-    except Exception as e:
-        return jsonify({"msg": str(e)}), 401  
-    
     users = User.query.all()
-    return render_template('dashboard.html', current_user=current_user, users=users, is_authenticated=is_authenticated)
+    return render_template('dashboard.html', current_user=current_user, users=users, is_authenticated=current_user.is_authenticated)
 
 @app.route('/user-dashboard/delete/<int:id>')
+@login_required
 def delete_user(id):
     user = User.query.get(id)
-
     if user:
         db.session.delete(user)
         db.session.commit()
@@ -134,58 +105,48 @@ def delete_user(id):
         return redirect(url_for('user_dashboard'))
     else:
         flash('User not found', 'danger')
-
     return render_template('dashboard.html')
 
 @app.route('/user-dashboard/create-user', methods=['GET', 'POST'])
 @app.route('/customers/create-customers', methods=['GET', 'POST'])
+@login_required
 def create_user():
-    is_authenticated, current_user = get_authenticated_user()
-    # print(current_user)
     form = SignupForm()
     if form.validate_on_submit():
         hashed_password = bcrypt.generate_password_hash(form.password.data).decode('utf-8')
         user = User(
-            username = form.username.data,
-            password = hashed_password,
-            role = form.role.data,
-            created_by = current_user['username'],
-            updated_by = None
+            username=form.username.data,
+            password=hashed_password,
+            role=form.role.data,
+            created_by=current_user.username,
+            updated_by=None
         )
         try:
             db.session.add(user)
             db.session.commit()
             flash('User created successfully.', 'success')
             if request.path.startswith('/user-dashboard'):
-                return(redirect(url_for('user_dashboard')))
+                return redirect(url_for('user_dashboard'))
             else:
                 return redirect(url_for('customers'))
         except Exception as e:
             db.session.rollback()
-            flash('An error occured.please try again.', 'danger')
+            flash('An error occurred. Please try again.', 'danger')
     return render_template('createUser.html', form=form)
 
 @app.route('/user-dashboard/update-user/<int:id>', methods=['GET', 'POST'])
 @app.route('/customers/update-customers/<int:id>', methods=['GET', 'POST'])
+@login_required
 def update_user(id):
-    is_authenticated, current_user = get_authenticated_user()
-
-    if not is_authenticated:
-        flash('You must be logged in to update a user.', 'danger')
-        return redirect(url_for('login'))
-    
     user = User.query.get_or_404(id)
-    
     form = SignupForm()
-
     if form.validate_on_submit():
         if form.password.data:  
             hashed_password = bcrypt.generate_password_hash(form.password.data).decode('utf-8')
             user.password = hashed_password
-
         user.username = form.username.data 
         user.role = form.role.data
-        user.updated_by = current_user['username'] 
+        user.updated_by = current_user.username 
 
         try:
             db.session.commit() 
@@ -205,20 +166,18 @@ def update_user(id):
 
 @app.context_processor
 def inject_authentication():
-    is_authenticated, current_user = get_authenticated_user()
-    return dict(is_authenticated=is_authenticated, current_user=current_user)
+    return dict(is_authenticated=current_user.is_authenticated, current_user=current_user)
 
 @app.route('/order', methods=['GET'])
+@login_required
 def orders():
     products = Products.query.all()  
     return render_template('orders.html', products=products)
 
-
 @app.route('/create_order/<int:product_id>', methods=['GET', 'POST'])
+@login_required
 def create_order(product_id):
-    is_authenticated, current_user = get_authenticated_user()
     product = Products.query.get_or_404(product_id)
-
     if request.method == 'POST':
         shipping_address = request.form['shipping_address']
         note = request.form.get('note')
@@ -241,7 +200,7 @@ def create_order(product_id):
             paid_amount=paid_amount,
             due_amount=due_amount,
             status='Pending',
-            created_by=current_user['username'],
+            created_by=current_user.username,
             updated_by=1 
         )
         db.session.add(new_order)
@@ -254,28 +213,29 @@ def create_order(product_id):
 
     return render_template('create_order.html', product=product)
 
-
 @app.route('/order_summary/<int:order_id>')
+@login_required
 def order_summary(order_id):
     order = Orders.query.get_or_404(order_id)
     return render_template('order_summary.html', order=order)
 
 @app.route('/products')
+@login_required
 def products():
     products = Products.query.all()
     return render_template('products.html', products=products)
 
 @app.route('/create-product', methods=['GET', 'POST'])
+@login_required
 def create_product():
-    is_authenticated, current_user = get_authenticated_user()
     form = AddProductForm()  
     if form.validate_on_submit():
         product = Products(
-            name = form.name.data,
-            price = form.price.data,
-            stock = form.stock.data,
-            created_by = current_user['username'],
-            updated_by = current_user['username']
+            name=form.name.data,
+            price=form.price.data,
+            stock=form.stock.data,
+            created_by=current_user.username,
+            updated_by=current_user.username
         )
         try:
             db.session.add(product)
@@ -284,11 +244,12 @@ def create_product():
             return redirect(url_for('products'))
         except Exception as e:
             db.session.rollback()
-            flash('An error occured.PLease try again', 'danger')
+            flash('An error occurred. Please try again', 'danger')
             print(str(e))
-    return render_template('createProduct.html', form=form) 
+    return render_template('createProduct.html', form=form)
 
 @app.route('/delete-product/<int:id>')
+@login_required
 def delete_product(id):
     try:
         product = Products.query.get(id)  
@@ -304,6 +265,7 @@ def delete_product(id):
     return redirect(url_for('products')) 
 
 @app.route('/update-product/<int:id>', methods=['GET', 'POST'])
+@login_required
 def update_product(id):
     product = Products.query.get(id)  
     if not product:
@@ -328,18 +290,17 @@ def update_product(id):
     return render_template('updateProduct.html', form=form, product=product)
 
 @app.route('/manage-order')
+@login_required
 def manage_order():
-    is_authenticated, current_user = get_authenticated_user()
-
-    if current_user['role'] == 'admin': 
+    if current_user.role == 'admin': 
         orders = Orders.query.all()  
     else:
-        orders = Orders.query.filter_by(created_by=current_user['username']).all()
+        orders = Orders.query.filter_by(created_by=current_user.username).all()
     
     return render_template('order_manager.html', orders=orders)
 
-
 @app.route('/accept_order/<int:order_id>', methods=['POST'])
+@login_required
 def accept_order(order_id):
     order = Orders.query.get_or_404(order_id)
     order.status = 'Accepted'  
@@ -348,6 +309,7 @@ def accept_order(order_id):
     return redirect(url_for('manage_order'))  
 
 @app.route('/reject_order/<int:order_id>', methods=['POST'])
+@login_required
 def reject_order(order_id):
     order = Orders.query.get_or_404(order_id)
     order.status = 'Rejected'
@@ -357,6 +319,5 @@ def reject_order(order_id):
 
 if __name__ == "__main__":
     with app.app_context():
-        db.create_all()  
+        db.create_all()
     app.run(debug=True)
-

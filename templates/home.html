@@ -18,7 +18,7 @@
 
     <div class="text-center">
         <div>
-            {% if is_authenticated %} 
+            {% if current_user.is_authenticated %} 
                 <h5>Hello, {{ current_user['username'] }}</h5>
             {% endif %}
 
@@ -26,7 +26,7 @@
             
             <p>
                 This application allows you to manage orders based on your role as a user 
-                {% if is_authenticated %} or an admin.
+                {% if current_user.is_authenticated %} or an admin.
             </p>
 
             <!-- Card Section -->

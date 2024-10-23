@@ -3,17 +3,6 @@ from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SelectField, SubmitField, IntegerField, FloatField, FieldList, FormField, DecimalField, TextAreaField
 from wtforms.validators import DataRequired, EqualTo, Length, ValidationError, NumberRange
 
-# class CreateUserForm(FlaskForm): 
-#     username = StringField('Username', validators=[DataRequired(), Length(min=4, max=20)])
-#     password = PasswordField('Password', validators=[DataRequired(), Length(min=4)])
-#     confirm_password = PasswordField('Confirm Password', validators=[DataRequired(), EqualTo('password')])
-#     role = SelectField('Role', choices=[('user', 'User'), ('admin', 'Admin')], validators=[DataRequired()])
-
-#     def validate_username(self, field):
-#         username = field.data
-#         user = User.query.filter_by(username=username).first()
-#         if user:
-#             raise ValidationError('Username already exists.')
 
 class SignupForm(FlaskForm):
     username = StringField('Username', validators=[DataRequired(), Length(min=4, max=20)])
